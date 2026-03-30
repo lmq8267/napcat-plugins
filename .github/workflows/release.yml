@@ -1,0 +1,173 @@
+name: 构建与发布插件
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'napcat-plugin-*/**'
+      - '.github/**'
+  workflow_dispatch:
+
+permissions: write-all
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 拉代码
+      - name: 拉代码
+        uses: actions/checkout@v4
+
+      # 2. Node 环境
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 3. 安装 pnpm
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      # 4. 构建 + 打包所有插件
+      - name: 打包所有插件
+        run: |
+          echo "🔍 查找插件目录..."
+          mkdir -p .plugin-zips
+          
+          sudo timedatectl set-timezone "Asia/Shanghai"
+
+          for dir in napcat-plugin-*; do
+            if [ -d "$dir" ]; then
+              echo "📦 处理插件: $dir"
+
+              cd $dir
+
+              echo "📥 安装依赖..."
+              if [ -f pnpm-lock.yaml ]; then
+                pnpm install
+              else
+                npm install
+              fi
+
+              echo "🔨 构建..."
+              npm run build
+
+              if [ ! -f index.mjs ]; then
+                echo "❌ $dir 构建失败（缺少 index.mjs）"
+                exit 1
+              fi
+
+              cd ..
+
+              echo "📦 打包 $dir..."
+              mkdir -p .plugin-zips/staging/$dir
+
+              cp $dir/index.mjs .plugin-zips/staging/$dir/
+              cp $dir/package.json .plugin-zips/staging/$dir/
+              [ -f "$dir/icon.png" ] && cp $dir/icon.png .plugin-zips/staging/$dir/
+
+              if [ -d "$dir/webui" ]; then
+                cp -r $dir/webui .plugin-zips/staging/$dir/
+              fi
+
+              if [ -d "$dir/resources" ]; then
+                cp -r $dir/resources .plugin-zips/staging/$dir/
+              fi
+
+              cd .plugin-zips/staging
+              zip -r ../$dir.zip $dir
+              cd ../..
+
+              rm -rf .plugin-zips/staging/$dir
+            fi
+          done
+
+          echo "✅ 所有插件打包完成"
+
+      # 5. 生成 plugin.json
+      - name: 生成 plugin.json
+        run: |
+          echo "📝 生成 plugin.json..."
+          echo '{' > plugin.json
+          echo '  "version": "1.0.0",' >> plugin.json
+          echo "  \"updateTime\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"," >> plugin.json
+          echo '  "plugins": [' >> plugin.json
+
+          FIRST=true
+          for dir in napcat-plugin-*; do
+            if [ -f "$dir/package.json" ]; then
+              NAME=$(node -p "require('./$dir/package.json').name")
+              VERSION=$(node -p "require('./$dir/package.json').version")
+              DESC=$(node -p "require('./$dir/package.json').description || ''")
+              AUTHOR=$(node -p "require('./$dir/package.json').author || ''")
+              HOMEPAGE=$(node -p "require('./$dir/package.json').homepage || ''")
+              PLUGIN_NAME=$(node -p "require('./$dir/package.json').plugin || '$NAME'")
+              TAGS=$(node -p "JSON.stringify(require('./$dir/package.json').napcat?.tags || [])")
+              MIN_VERSION=$(node -p "require('./$dir/package.json').napcat?.minVersion || ''")
+
+              if [ "$FIRST" = true ]; then
+                FIRST=false
+              else
+                echo ',' >> plugin.json
+              fi
+
+              printf '    {\n      "id": "%s",\n      "name": "%s",\n      "version": "%s",\n      "description": "%s",\n      "author": "%s",\n      "homepage": "%s",\n      "downloadUrl": "https://github.com/%s/releases/download/plugins/%s.zip",\n      "tags": %s,\n      "minVersion": "%s"\n    }' "$NAME" "$PLUGIN_NAME" "$VERSION" "$DESC" "$AUTHOR" "$HOMEPAGE" "${GITHUB_REPOSITORY}" "$NAME" "$TAGS" "$MIN_VERSION" >> plugin.json
+            fi
+          done
+
+          echo '' >> plugin.json
+          echo '  ]' >> plugin.json
+          echo '}' >> plugin.json
+          echo "✅ plugin.json 生成完成"
+          cat plugin.json
+
+      # 6. 提交 plugin.json
+      - name: 提交 plugin.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add plugin.json
+
+          git diff --cached --quiet && echo "plugin.json 无变化" || {
+            git commit -m "更新插件，时间： $(date '+%Y-%m-%d %H:%M:%S')"
+            git push
+          }
+
+      # 7. 发布 Release
+      - name: 发布 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_TAG="plugins"
+          build_time=$(date '+%Y年%m月%d日%H:%M:%S' | jq -sRr @uri)
+
+          RELEASE_NOTES=$(cat <<EOF
+          > ### ![](https://img.shields.io/badge/打包时间-${build_time}-8267?logo=github&labelColor=%E9%A1%BB)![](https://img.shields.io/github/downloads/${GITHUB_REPOSITORY}/${RELEASE_TAG}/total?label=下载次数&logo=github)
+
+          由GitHub CI自动打包的插件
+          EOF
+          )
+
+          if ! gh release view "$RELEASE_TAG" &>/dev/null; then
+            gh release create "$RELEASE_TAG" \
+              --title "NapCat Plugins" \
+              --notes "$RELEASE_NOTES" \
+              --latest=true
+          else
+            gh release edit "$RELEASE_TAG" \
+            --notes "$RELEASE_NOTES"
+          fi
+
+          echo "🚀 上传所有插件..."
+
+          for file in .plugin-zips/*.zip; do
+            gh release upload "$RELEASE_TAG" "$file" --clobber
+          done
+
+          echo "✅ 发布完成"
+
+

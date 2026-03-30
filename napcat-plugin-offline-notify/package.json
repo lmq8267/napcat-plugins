@@ -1,0 +1,25 @@
+{
+  "name": "napcat-plugin-offline-notify",
+  "plugin": "离线通知",
+  "version": "1.0.0",
+  "icon": "icon.png",
+  "type": "module",
+  "main": "index.mjs",
+  "description": "监控帐号状态离线时采用企业微信机器人推送通知的插件",
+  "author": "lmq8267",
+  "napcat": {
+    "tags": ["工具", "监控"],
+    "minVersion": "4.14.0"
+  },
+  "dependencies": {
+    "napcat-types": "0.0.9"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^6.0.0"
+  },
+  "scripts": {
+    "build": "vite build"
+  }
+}
