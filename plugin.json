@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "updateTime": "2026-03-30T12:58:38Z",
+  "plugins": [
+    {
+      "id": "napcat-plugin-offline-notify",
+      "name": "离线通知",
+      "version": "1.0.0",
+      "description": "监控帐号状态离线时采用企业微信机器人推送通知的插件",
+      "author": "lmq8267",
+      "homepage": "",
+      "downloadUrl": "https://github.com/lmq8267/napcat-plugins/releases/download/plugins/napcat-plugin-offline-notify.zip",
+      "tags": ["工具","监控"],
+      "minVersion": "4.14.0"
+    }
+  ]
+}
