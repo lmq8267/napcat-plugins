@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "updateTime": "2026-03-31T04:22:37Z",
+  "plugins": [
+    {
+      "id": "napcat-plugin-offline-notify",
+      "name": "离线通知",
+      "version": "1.0.0",
+      "description": "监控帐号状态离线时采用企业微信机器人推送通知的插件",
+      "author": "lmq8267",
+      "homepage": "",
+      "downloadUrl": "https://github.com/lmq8267/napcat-plugins/releases/download/plugins/napcat-plugin-offline-notify.zip",
+      "tags": ["工具","监控"],
+      "minVersion": "4.14.0"
+    },
+    {
+      "id": "napcat-plugin-qq-version",
+      "name": "QQ版本更新",
+      "version": "1.0.0",
+      "description": "检测 QQ 版本与 NapCat 推荐的 QQ 版本，支持在线更新升级",
+      "author": "AQiaoYo",
+      "homepage": "",
+      "downloadUrl": "https://github.com/lmq8267/napcat-plugins/releases/download/plugins/napcat-plugin-qq-version.zip",
+      "tags": ["工具"],
+      "minVersion": "4.14.0"
+    }
+  ]
+}
