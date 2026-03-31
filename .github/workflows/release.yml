@@ -55,26 +55,45 @@ jobs:
               echo "🔨 构建..."
               npm run build
 
-              if [ ! -f index.mjs ]; then
-                echo "❌ $dir 构建失败（缺少 index.mjs）"
-                exit 1
-              fi
-
               cd ..
 
               echo "📦 打包 $dir..."
               mkdir -p .plugin-zips/staging/$dir
 
-              cp $dir/index.mjs .plugin-zips/staging/$dir/
-              cp $dir/package.json .plugin-zips/staging/$dir/
-              [ -f "$dir/icon.png" ] && cp $dir/icon.png .plugin-zips/staging/$dir/
+              if [ -f "$dir/dist/index.mjs" ]; then
+                  echo "📁 使用 dist 结构"
 
-              if [ -d "$dir/webui" ]; then
-                cp -r $dir/webui .plugin-zips/staging/$dir/
-              fi
+                  cp "$dir/dist/index.mjs" .plugin-zips/staging/$dir/
+                  cp "$dir/package.json" .plugin-zips/staging/$dir/
+                  [ -f "$dir/icon.png" ] && cp "$dir/icon.png" .plugin-zips/staging/$dir/
 
-              if [ -d "$dir/resources" ]; then
-                cp -r $dir/resources .plugin-zips/staging/$dir/
+                  if [ -d "$dir/dist/webui" ]; then
+                      cp -r "$dir/dist/webui" .plugin-zips/staging/$dir/
+                  elif [ -d "$dir/webui" ]; then
+                      cp -r "$dir/webui" .plugin-zips/staging/$dir/
+                  fi
+
+                  if [ -d "$dir/resources" ]; then
+                      cp -r "$dir/resources" .plugin-zips/staging/$dir/
+                  fi
+
+              elif [ -f "$dir/index.mjs" ]; then
+                  echo "📁 使用根目录结构"
+
+                  cp "$dir/index.mjs" .plugin-zips/staging/$dir/
+                  cp "$dir/package.json" .plugin-zips/staging/$dir/
+                  [ -f "$dir/icon.png" ] && cp "$dir/icon.png" .plugin-zips/staging/$dir/
+
+                  if [ -d "$dir/webui" ]; then
+                    cp -r "$dir/webui" .plugin-zips/staging/$dir/
+                  fi
+
+                  if [ -d "$dir/resources" ]; then
+                    cp -r "$dir/resources" .plugin-zips/staging/$dir/
+                  fi
+              else
+                  echo "❌ $dir 构建失败（未找到 index.mjs）"
+                  exit 1
               fi
 
               cd .plugin-zips/staging
@@ -100,13 +119,13 @@ jobs:
           for dir in napcat-plugin-*; do
             if [ -f "$dir/package.json" ]; then
               NAME=$(node -p "require('./$dir/package.json').name")
-              VERSION=$(node -p "require('./$dir/package.json').version")
-              DESC=$(node -p "require('./$dir/package.json').description || ''")
-              AUTHOR=$(node -p "require('./$dir/package.json').author || ''")
-              HOMEPAGE=$(node -p "require('./$dir/package.json').homepage || ''")
-              PLUGIN_NAME=$(node -p "require('./$dir/package.json').plugin || '$NAME'")
+              VERSION=$(node -p "JSON.stringify(require('./$dir/package.json').version)")
+              DESC=$(node -p "JSON.stringify(require('./$dir/package.json').description || '')")
+              AUTHOR=$(node -p "JSON.stringify(require('./$dir/package.json').author || '')")
+              HOMEPAGE=$(node -p "JSON.stringify(require('./$dir/package.json').homepage || '')")
+              PLUGIN_NAME=$(node -p "JSON.stringify(require('./$dir/package.json').plugin || '$NAME')")
               TAGS=$(node -p "JSON.stringify(require('./$dir/package.json').napcat?.tags || [])")
-              MIN_VERSION=$(node -p "require('./$dir/package.json').napcat?.minVersion || ''")
+              MIN_VERSION=$(node -p "JSON.stringify(require('./$dir/package.json').napcat?.minVersion || '')")
 
               if [ "$FIRST" = true ]; then
                 FIRST=false
@@ -114,7 +133,8 @@ jobs:
                 echo ',' >> plugin.json
               fi
 
-              printf '    {\n      "id": "%s",\n      "name": "%s",\n      "version": "%s",\n      "description": "%s",\n      "author": "%s",\n      "homepage": "%s",\n      "downloadUrl": "https://github.com/%s/releases/download/plugins/%s.zip",\n      "tags": %s,\n      "minVersion": "%s"\n    }' "$NAME" "$PLUGIN_NAME" "$VERSION" "$DESC" "$AUTHOR" "$HOMEPAGE" "${GITHUB_REPOSITORY}" "$NAME" "$TAGS" "$MIN_VERSION" >> plugin.json
+              printf '    {\n      "id": "%s",\n      "name": %s,\n      "version": %s,\n      "description": %s,\n      "author": %s,\n      "homepage": %s,\n      "downloadUrl": "https://github.com/%s/releases/download/plugins/%s.zip",\n      "tags": %s,\n      "minVersion": %s\n    }' \
+                "$NAME" "$PLUGIN_NAME" "$VERSION" "$DESC" "$AUTHOR" "$HOMEPAGE" "${GITHUB_REPOSITORY}" "$NAME" "$TAGS" "$MIN_VERSION" >> plugin.json
             fi
           done
 
@@ -169,5 +189,6 @@ jobs:
           done
 
           echo "✅ 发布完成"
+
 
 
