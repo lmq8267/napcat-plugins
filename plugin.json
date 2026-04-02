@@ -1,7 +1,18 @@
 {
   "version": "1.0.0",
-  "updateTime": "2026-03-31T04:22:37Z",
+  "updateTime": "2026-04-02T13:06:31Z",
   "plugins": [
+    {
+      "id": "napcat-plugin-emoji-reply",
+      "name": "随机回应表情",
+      "version": "1.0.0",
+      "description": "随机回应表情的插件，支持多个 QQ 号、QFace 表情选择、随机回应数量",
+      "author": "lmq8267",
+      "homepage": "",
+      "downloadUrl": "https://github.com/lmq8267/napcat-plugins/releases/download/plugins/napcat-plugin-emoji-reply.zip",
+      "tags": ["工具","娱乐"],
+      "minVersion": "4.14.0"
+    },
     {
       "id": "napcat-plugin-offline-notify",
       "name": "离线通知",
