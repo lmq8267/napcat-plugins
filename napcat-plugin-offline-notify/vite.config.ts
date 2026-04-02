@@ -10,7 +10,7 @@ export default defineConfig({
       fileName: () => 'index.mjs',
     },
     rollupOptions: {
-      external: ['fs', 'path', 'napcat-types/napcat-onebot/network/plugin-manger'],
+      external: ['fs', 'path', 'napcat-types/napcat-onebot/network/plugin-manger', 'url'],
       plugins: [nodeResolve()],
     },
     outDir: '.',

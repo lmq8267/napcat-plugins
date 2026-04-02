@@ -1,0 +1,89 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - 'v*'
+    workflow_dispatch:
+        inputs:
+            version:
+                description: '版本号 (如 v1.0.0)'
+                required: true
+                type: string
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            - name: Get version
+              id: get_version
+              run: |
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+                      echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+                  else
+                      echo "version=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Install dependencies
+              run: pnpm install
+              working-directory: napcat-plugin-emoji-reply
+
+            - name: Build
+              run: pnpm run build
+              working-directory: napcat-plugin-emoji-reply
+
+            - name: Copy assets
+              run: |
+                  cp -r napcat-plugin-emoji-reply/webui napcat-plugin-emoji-reply/dist/webui
+                  cp napcat-plugin-emoji-reply/emoji-data.json napcat-plugin-emoji-reply/dist/emoji-data.json
+              working-directory: .
+
+            - name: Create zip
+              run: |
+                  cd napcat-plugin-emoji-reply/dist
+                  zip -r ../napcat-plugin-emoji-reply.zip .
+
+            - name: Generate Release Note
+              id: release_note
+              run: |
+                  VERSION=${{ steps.get_version.outputs.version }}
+                  PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+                  if [ -n "$PREV_TAG" ]; then
+                      CHANGELOG=$(git log --pretty=format:"- %s" $PREV_TAG..HEAD)
+                  else
+                      CHANGELOG=$(git log --pretty=format:"- %s" HEAD)
+                  fi
+                  echo "release_note<<EOF" >> $GITHUB_OUTPUT
+                  echo "## 随机回应表情插件 $VERSION" >> $GITHUB_OUTPUT
+                  echo "" >> $GITHUB_OUTPUT
+                  echo "### 更新内容" >> $GITHUB_OUTPUT
+                  echo "$CHANGELOG" >> $GITHUB_OUTPUT
+                  echo "" >> $GITHUB_OUTPUT
+                  echo "### 安装方式" >> $GITHUB_OUTPUT
+                  echo "下载附件中的 zip 文件，解压到 NapCat 的 plugins 目录即可。" >> $GITHUB_OUTPUT
+                  echo "EOF" >> $GITHUB_OUTPUT
+
+            - name: Create Release
+              uses: softprops/action-gh-release@v1
+              with:
+                  name: ${{ steps.get_version.outputs.version }}
+                  body: ${{ steps.release_note.outputs.release_note }}
+                  files: napcat-plugin-emoji-reply/napcat-plugin-emoji-reply.zip
+                  draft: false
+                  prerelease: false
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

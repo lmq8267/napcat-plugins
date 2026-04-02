@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>随机回应表情 · 配置</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{p:'#FB7299',pd:'#e05a80'}}}}</script>
+<style>
+*{margin:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-serif}
+.glass{background:rgba(255,255,255,.85);backdrop-filter:blur(16px);border-radius:14px;border:1px solid rgba(251,114,153,.12);box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.dark .glass{background:rgba(30,30,32,.75);border-color:rgba(251,114,153,.08)}
+.sb{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:10px;color:#64748b;cursor:pointer;font-size:13px;font-weight:500;transition:all .2s;user-select:none}
+.dark .sb{color:#94a3b8}
+.sb:hover{background:rgba(251,114,153,.08);color:#FB7299}
+.sb.active{background:linear-gradient(135deg,#FB7299,#e05a80);color:#fff;box-shadow:0 2px 10px rgba(251,114,153,.35)}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:7px 16px;border-radius:9px;font-weight:500;cursor:pointer;border:none;gap:6px;font-size:13px;transition:all .2s}
+.btn:active{transform:scale(.96)}
+.btn-p{background:linear-gradient(135deg,#FB7299,#e05a80);color:#fff;box-shadow:0 2px 8px rgba(251,114,153,.25)}
+.btn-p:hover{box-shadow:0 4px 14px rgba(251,114,153,.35)}
+.btn-s{background:rgba(251,114,153,.1);color:#FB7299;border:1px solid rgba(251,114,153,.2)}
+.dark .btn-s{color:#fda4b9;border-color:rgba(251,114,153,.15)}
+.btn-s:hover{background:rgba(251,114,153,.18)}
+.ipt{width:100%;padding:8px 12px;border-radius:9px;border:1px solid rgba(251,114,153,.18);background:rgba(255,255,255,.9);font-size:13px;color:#1e293b}
+.dark .ipt{background:rgba(30,30,32,.6);border-color:rgba(251,114,153,.12);color:#e2e8f0}
+.ipt:focus{outline:none;border-color:#FB7299;box-shadow:0 0 0 3px rgba(251,114,153,.15)}
+.tgl{position:relative;width:40px;height:22px;background:#cbd5e1;border-radius:11px;cursor:pointer;transition:background .25s}
+.dark .tgl{background:#334155}
+.tgl.on{background:linear-gradient(135deg,#FB7299,#e05a80)}
+.tgl::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .25s;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.tgl.on::after{transform:translateX(18px)}
+.pg{display:none}
+.pg.active{display:block}
+.toast-c{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{padding:12px 24px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.15);display:flex;align-items:center;gap:8px;animation:si .3s ease;font-size:14px;font-weight:500;min-width:200px;justify-content:center}
+.toast.success{background:#10b981;color:#fff;border:1px solid #059669}
+.toast.error{background:#ef4444;color:#fff;border:1px solid #dc2626}
+.toast.info{background:#FB7299;color:#fff;border:1px solid #e05a80}
+@keyframes si{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+.tag{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-size:12px;background:rgba(251,114,153,.1);color:#FB7299;max-width:200px}
+.tag button{background:none;border:none;cursor:pointer;color:inherit;font-size:14px;line-height:1}
+.tag button:hover{color:#ef4444}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:10000}
+.modal-overlay.active{display:flex}
+.modal{background:#fff;border-radius:16px;padding:24px;width:90%;max-width:700px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column}
+.dark .modal{background:#1e1e20}
+.modal-h{font-size:18px;font-weight:600;margin-bottom:16px;color:#374151;display:flex;align-items:center;justify-content:between}
+.dark .modal-h{color:#f3f4f6}
+.emoji-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;flex:1;overflow-y:auto;padding:12px;background:#f9fafb;border-radius:8px}
+.dark .emoji-grid{background:#2a2a2e}
+.emoji-item{width:52px;height:52px;border-radius:8px;border:2px solid transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;background:#fff;transition:all .2s;overflow:hidden;flex-shrink:0}
+.dark .emoji-item{background:#1e1e20}
+.emoji-item:hover{transform:scale(1.1)}
+.emoji-item.selected{border-color:#FB7299;box-shadow:0 0 8px rgba(251,114,153,.4)}
+.emoji-item img{width:40px;height:40px;object-fit:contain}
+.emoji-item .lbl{position:absolute;font-size:10px;bottom:2px;color:#666}
+.selected-emojis{display:flex;flex-wrap:wrap;gap:8px;max-height:120px;overflow-y:auto;padding:8px;background:#f9fafb;border-radius:8px;margin-top:12px}
+.dark .selected-emojis{background:#2a2a2e}
+.log-c{background:#0c1222;border-radius:10px;padding:12px;max-height:400px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.6}
+.log-e{padding:1px 0;white-space:pre-wrap;word-break:break-all}
+.log-e .lt{color:#475569}
+.log-e.log-info .ll{color:#60a5fa}
+.log-e.log-warn .ll{color:#fbbf24}
+.log-e.log-error .ll{color:#f87171}
+.log-e .lm{color:#e2e8f0}
+.grp-multi{max-height:200px;overflow-y:auto;border:1px solid rgba(251,114,153,.18);border-radius:9px;padding:8px}
+.dark .grp-multi{border-color:rgba(251,114,153,.12)}
+.grp-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer}
+.grp-item:hover{background:rgba(251,114,153,.1)}
+.grp-item input{width:16px;height:16px}
+</style>
+</head>
+<body class="bg-pink-50 dark:bg-slate-900 text-gray-800 dark:text-gray-200">
+<div id="tc" class="toast-c"></div>
+
+<!-- 表情选择模态窗 -->
+<div id="emojiModal" class="modal-overlay">
+    <div class="modal">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h3 class="text-lg font-bold">😊 选择表情</h3>
+            <button onclick="closeEmojiModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#666">×</button>
+        </div>
+        <input type="text" id="emojiSearch" class="ipt mb-2" placeholder="搜索表情（名称/ID/拼音）..." oninput="renderEmojiGrid()">
+        <div class="emoji-grid" id="emojiGrid"></div>
+        <div class="selected-emojis" id="selectedEmojis"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;">
+            <span class="text-sm text-gray-500">已选 <span id="modalEmojiCount" class="text-pink-500 font-bold">0</span> 个表情</span>
+            <button onclick="confirmEmojiSelect()" class="btn btn-p">确定</button>
+        </div>
+    </div>
+</div>
+
+<div class="flex h-screen">
+<aside class="w-48 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+<div class="p-4 border-b border-gray-200 dark:border-gray-700">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 bg-gradient-to-br from-pink-400 to-pink-600 rounded-lg flex items-center justify-center text-white text-lg">😊</div>
+<div class="flex-1"><div class="font-bold text-sm">随机回应表情</div><div class="text-xs text-gray-400" id="ver">v1.0.0</div></div>
+<a href="https://github.com/lmq8267/napcat-plugins" target="_blank" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" title="GitHub">
+<svg class="w-5 h-5" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+</a>
+</div>
+</div>
+<nav class="flex-1 p-2 overflow-y-auto">
+<div class="sb active" onclick="go('dashboard',this)">📊 状态</div>
+<div class="sb" onclick="go('config',this)">⚙️ 配置</div>
+<div class="sb" onclick="go('groups',this)">👥 群列表</div>
+<div class="sb" onclick="go('logs',this)">📝 日志</div>
+</nav>
+<div class="p-3 border-t border-gray-200 dark:border-gray-700">
+<button onclick="toggleTheme()" class="text-xs text-gray-400 hover:text-pink-500">🌓 切换主题</button>
+</div>
+</aside>
+<div class="flex-1 flex flex-col overflow-hidden">
+<header class="bg-white/80 dark:bg-slate-800/80 backdrop-blur border-b border-gray-200 dark:border-gray-700 px-5 py-3 flex justify-end items-center gap-3">
+<button onclick="doSave()" class="btn btn-p">💾 保存</button>
+</header>
+<main class="flex-1 overflow-y-auto p-5">
+
+<div id="pg-dashboard" class="pg active">
+<div class="glass p-5 mb-4">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 bg-gradient-to-br from-pink-400 to-pink-600 rounded-xl text-white text-xl flex items-center justify-center">😊</div>
+<div><h3 class="font-bold text-lg">随机回应表情</h3><p class="text-xs text-gray-400">自动回应指定用户的消息</p></div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+<div class="text-center p-3 rounded-lg bg-pink-50 dark:bg-pink-950/30"><div class="text-xl font-bold" id="d-enabled">-</div><div class="text-xs text-gray-500 mt-1">启用状态</div></div>
+<div class="text-center p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30"><div class="text-xl font-bold text-emerald-500" id="d-users">-</div><div class="text-xs text-gray-500 mt-1">目标用户</div></div>
+<div class="text-center p-3 rounded-lg bg-violet-50 dark:bg-violet-950/30"><div class="text-xl font-bold text-violet-500" id="d-emojis">-</div><div class="text-xs text-gray-500 mt-1">选中表情</div></div>
+<div class="text-center p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30"><div class="text-xl font-bold text-amber-500" id="d-count">-</div><div class="text-xs text-gray-500 mt-1">回应数量</div></div>
+</div>
+</div>
+<div class="glass p-5">
+<div class="text-xs font-semibold text-pink-500 uppercase mb-3">统计</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-800/50">
+<div class="text-xs text-gray-500">总回应次数</div>
+<div class="text-2xl font-bold text-pink-500" id="d-total">0</div>
+</div>
+<div class="p-3 rounded-lg bg-gray-50 dark:bg-slate-800/50">
+<div class="text-xs text-gray-500">今日回应</div>
+<div class="text-2xl font-bold text-pink-500" id="d-today">0</div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="pg-config" class="pg">
+<div class="glass p-5 mb-4">
+<div class="flex items-center justify-between">
+<div><h3 class="font-semibold">启用插件</h3><p class="text-xs text-gray-400">开启后将自动回应指定用户的消息</p></div>
+<div class="tgl" id="c-enabled" onclick="tg(this)"></div>
+</div>
+</div>
+
+<div class="glass p-5 mb-4">
+<h3 class="font-semibold mb-3">🎯 回应用户 QQ 号</h3>
+<div class="flex gap-2 mb-3">
+<input type="text" id="c-userIpt" class="ipt" placeholder="输入 QQ 号后点击添加">
+<button onclick="addUser()" class="btn btn-p">添加</button>
+</div>
+<div class="flex flex-wrap gap-2" id="userTags"></div>
+</div>
+
+<div class="glass p-5 mb-4">
+<h3 class="font-semibold mb-3">🎲 随机回应数量</h3>
+<div class="flex items-center gap-3">
+<input type="number" id="c-count" class="ipt w-32" value="1" min="0" onchange="updateCount()">
+<span class="text-sm text-gray-500">0 = 回应全部选中的表情</span>
+</div>
+</div>
+
+<div class="glass p-5 mb-4">
+<h3 class="font-semibold mb-3">👥 指定 QQ 群（可选，可多选）</h3>
+<div class="grp-multi" id="grpMulti"></div>
+<p class="text-xs text-gray-400 mt-2">不选表示回应所有群聊中的目标用户</p>
+</div>
+
+<div class="glass p-5 mb-4">
+<h3 class="font-semibold mb-3">😊 选择表情</h3>
+<button onclick="openEmojiModal()" class="btn btn-s mb-2">😊 打开表情选择器</button>
+<div class="text-xs text-gray-500">已选 <span id="emojiCount" class="text-pink-500 font-bold">0</span> 个表情</div>
+<div class="selected-emojis" id="pageSelectedEmojis"></div>
+</div>
+</div>
+
+<div id="pg-groups" class="pg">
+<div class="glass p-5">
+<h3 class="font-bold mb-4">群列表</h3>
+<table class="w-full">
+<thead class="bg-gray-50 dark:bg-slate-800">
+<tr>
+<th class="px-4 py-2 text-left text-xs font-medium text-gray-500">群号</th>
+<th class="px-4 py-2 text-left text-xs font-medium text-gray-500">群名</th>
+<th class="px-4 py-2 text-left text-xs font-medium text-gray-500">成员数</th>
+</tr>
+</thead>
+<tbody id="groupList" class="divide-y divide-gray-200 dark:divide-gray-700"></tbody>
+</table>
+</div>
+</div>
+
+<div id="pg-logs" class="pg">
+<div class="glass p-5">
+<div class="flex items-center justify-between mb-3">
+<div><h3 class="font-bold">运行日志</h3><p class="text-xs text-gray-400">查看插件运行日志</p></div>
+<div class="flex gap-2">
+<button onclick="loadLogs()" class="btn btn-p">🔄 刷新</button>
+<button onclick="clrLogs()" class="btn btn-s">🗑️ 清除</button>
+</div>
+</div>
+<div class="flex gap-2 mb-2">
+<button class="text-xs px-3 py-1 rounded-lg border" style="border-color:rgba(251,114,153,.2);background:linear-gradient(135deg,#FB7299,#e05a80);color:#fff" onclick="fltLog('all',this)">全部</button>
+<button class="text-xs px-3 py-1 rounded-lg border" style="border-color:rgba(251,114,153,.2);background:rgba(251,114,153,.1);color:#FB7299" onclick="fltLog('info',this)">INFO</button>
+<button class="text-xs px-3 py-1 rounded-lg border" style="border-color:rgba(251,114,153,.2);background:rgba(251,114,153,.1);color:#FB7299" onclick="fltLog('warn',this)">WARN</button>
+<button class="text-xs px-3 py-1 rounded-lg border" style="border-color:rgba(251,114,153,.2);background:rgba(251,114,153,.1);color:#FB7299" onclick="fltLog('error',this)">ERROR</button>
+</div>
+<div id="logC" class="log-c"><p style="color:#64748b">加载中...</p></div>
+<div class="flex items-center justify-between mt-2">
+<span class="text-xs text-gray-400" id="logCnt">0 条</span>
+<label class="flex items-center gap-1 text-xs text-gray-500 cursor-pointer"><input type="checkbox" id="logAS" checked> 自动滚动</label>
+</div>
+</div>
+</div>
+
+</main>
+</div>
+</div>
+
+<script>
+const API='/plugin/napcat-plugin-emoji-reply/api';
+const EMOJI_LIST=[];
+let C={},S={},groups=[];
+let logFlt='all';
+let tempSelectedEmojis=new Set();
+function $(id){return document.getElementById(id)}
+function toast(m,t='info'){const c=$('tc'),d=document.createElement('div');d.className='toast '+t;d.textContent=m;c.appendChild(d);setTimeout(()=>{d.style.opacity='0';setTimeout(()=>d.remove(),300)},3000)}
+function tg(el){el.classList.toggle('on')}
+function gtg(id){return $(id)?.classList.contains('on')||false}
+function stg(id,v){const e=$(id);if(e){if(v)e.classList.add('on');else e.classList.remove('on')}}
+function sv(id,v){const e=$(id);if(e)e.value=v}
+function gn(id,d){const v=parseInt($(id)?.value);return isNaN(v)?d:v}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+async function af(p,m='GET',b=null){const o={method:m,headers:{'Content-Type':'application/json'}};if(b)o.body=JSON.stringify(b);return(await fetch(API+p,o)).json()}
+function go(pg,el){
+    document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.sb').forEach(s=>s.classList.remove('active'));
+    $('pg-'+pg)?.classList.add('active');
+    el?.classList.add('active');
+    
+    if(pg==='dashboard'){
+        loadData().then(() => updDash());
+    }
+    if(pg==='config'){
+        loadData();
+    }
+    if(pg==='groups'){
+        loadData();
+    }
+    if(pg==='logs'){
+        loadLogs();
+    }
+}
+function toggleTheme(){document.documentElement.classList.toggle('dark')}
+function getEmojiUrl(id,isStatic){
+    if(isStatic){
+        return `https://koishi.js.org/QFace/assets/qq_emoji/${id}/png/${id}.png`;
+    }
+    return `https://koishi.js.org/QFace/assets/qq_emoji/${id}/apng/${id}.png`;
+}
+
+function renderUserTags(){
+    const con=$('userTags');
+    if(!C.targetUserIds||!C.targetUserIds.length){con.innerHTML='<span class="text-gray-400 text-sm">暂无目标用户</span>';return}
+    con.innerHTML=C.targetUserIds.map(id=>`<span class="tag">${id}<button onclick="delUser('${id}')">×</button></span>`).join('');
+}
+function renderPageSelectedEmojis(){
+    const con=$('pageSelectedEmojis');
+    const sel=C.selectedEmojiIds||[];
+    $('emojiCount').textContent=sel.length;
+    if(!sel.length){con.innerHTML='<span class="text-gray-400 text-sm">暂无选中表情</span>';return}
+    con.innerHTML=sel.map(id=>{
+        const e=EMOJI_LIST.find(x=>x.QSid===id);
+        const isStatic=e?.isStatic==='1';
+        return `<span class="tag"><img src="${getEmojiUrl(id,isStatic)}" style="width:18px;height:18px">${e?e.QDes:id}<button onclick="delEmoji('${id}')">×</button></span>`;
+    }).join('');
+}
+function renderGrpMulti(){
+    const con=$('grpMulti');
+    const selGrps=C.groupIds||[];
+    con.innerHTML=groups.map(g=>`
+        <div class="grp-item" onclick="tglGrp('${g.group_id}')">
+            <input type="checkbox" ${selGrps.includes(g.group_id)?'checked':''}>
+            <span>${g.group_name} (${g.group_id})</span>
+        </div>
+    `).join('');
+}
+function tglGrp(id){
+    if(!C.groupIds)C.groupIds=[];
+    const i=C.groupIds.indexOf(id);
+    if(i>=0)C.groupIds.splice(i,1);else C.groupIds.push(id);
+    renderGrpMulti();
+}
+function addUser(){
+    const v=$('c-userIpt').value.trim();
+    if(v&&!C.targetUserIds.includes(v)){
+        if(!C.targetUserIds)C.targetUserIds=[];
+        C.targetUserIds.push(v);
+        $('c-userIpt').value='';
+        renderUserTags();
+    }
+}
+function delUser(id){
+    C.targetUserIds=C.targetUserIds.filter(x=>x!==id);
+    renderUserTags();
+}
+function delEmoji(id){
+    C.selectedEmojiIds=C.selectedEmojiIds.filter(x=>x!==id);
+    renderPageSelectedEmojis();
+}
+function updateCount(){C.randomCount=gn('c-count',1)}
+
+function openEmojiModal(){
+    tempSelectedEmojis=new Set(C.selectedEmojiIds||[]);
+    $('emojiModal').classList.add('active');
+    renderEmojiGrid();
+    renderModalSelectedEmojis();
+}
+function closeEmojiModal(){
+    $('emojiModal').classList.remove('active');
+}
+function confirmEmojiSelect(){
+    C.selectedEmojiIds=Array.from(tempSelectedEmojis);
+    renderPageSelectedEmojis();
+    closeEmojiModal();
+}
+function tglTempEmoji(id){
+    if(tempSelectedEmojis.has(id))tempSelectedEmojis.delete(id);else tempSelectedEmojis.add(id);
+    renderEmojiGrid();
+    renderModalSelectedEmojis();
+}
+function renderEmojiGrid(){
+    const q=$('emojiSearch')?.value.toLowerCase()||'';
+    const filtered=EMOJI_LIST.filter(e=>e.QDes.toLowerCase().includes(q)||e.QSid.includes(q)||(e.Input||[]).some(i=>i.toLowerCase().includes(q)));
+    const grid=$('emojiGrid');
+    grid.innerHTML=filtered.map(e=>{
+        const isSel=tempSelectedEmojis.has(e.QSid);
+        const isStatic=e.isStatic==='1';
+        return `<div class="emoji-item${isSel?' selected':''}" onclick="tglTempEmoji('${e.QSid}')" title="${e.QDes} (${e.QSid})"><img src="${getEmojiUrl(e.QSid,isStatic)}" loading="lazy" alt="${e.QDes}"></div>`;
+    }).join('');
+}
+function renderModalSelectedEmojis(){
+    const con=$('selectedEmojis');
+    const sel=Array.from(tempSelectedEmojis);
+    $('modalEmojiCount').textContent=sel.length;
+    if(!sel.length){con.innerHTML='<span class="text-gray-400 text-sm">暂无选中表情</span>';return}
+    con.innerHTML=sel.map(id=>{
+        const e=EMOJI_LIST.find(x=>x.QSid===id);
+        const isStatic=e?.isStatic==='1';
+        return `<span class="tag"><img src="${getEmojiUrl(id,isStatic)}" style="width:18px;height:18px">${e?e.QDes:id}<button onclick="tglTempEmoji('${id}')">×</button></span>`;
+    }).join('');
+}
+
+async function loadData(){
+    try{
+        const [cfgRes,emojiRes,grpRes,statusRes]=await Promise.all([
+            af('/config'),
+            af('/emoji-list'),
+            af('/groups'),
+            af('/status')
+        ]);
+        if(cfgRes.success){C=cfgRes.data||{};fillCfg()}
+        if(emojiRes.success){EMOJI_LIST.length=0;EMOJI_LIST.push(...(emojiRes.data||[]));}
+        if(grpRes.success){groups=grpRes.data||[];fillGrps();renderGrpMulti();}
+        if(statusRes.success){
+            $('ver').textContent = statusRes.version || 'v1.0.0';
+            if(statusRes.data && statusRes.data.stats){
+                C.stats = statusRes.data.stats;
+            }
+        }
+        renderPageSelectedEmojis();
+    }catch(e){toast('加载数据失败:'+e)}
+}
+function fillCfg(){
+    stg('c-enabled',C.enabled);
+    $('c-count').value=C.randomCount||1;
+    renderUserTags();
+}
+function fillGrps(){
+    const tbl=$('groupList');
+    tbl.innerHTML=groups.map(g=>`<tr><td class="px-4 py-3">${g.group_id}</td><td class="px-4 py-3">${g.group_name}</td><td class="px-4 py-3">${g.member_count}/${g.max_member_count}</td></tr>`).join('');
+}
+async function doSave(){
+    C.enabled=gtg('c-enabled');
+    C.randomCount=gn('c-count',1);
+    try{
+        const r=await af('/config','POST',C);
+        if(r.success){toast('配置已保存','success');loadData();}else toast(r.error||'保存失败','error')
+    }catch(e){toast('保存失败:'+e)}
+}
+function updDash(){
+    $('d-enabled').textContent=C.enabled?'已启用':'已禁用';
+    $('d-enabled').className=`text-xl font-bold ${C.enabled?'text-emerald-500':'text-gray-400'}`;
+    $('d-users').textContent=(C.targetUserIds||[]).length;
+    $('d-emojis').textContent=(C.selectedEmojiIds||[]).length;
+    const cnt=C.randomCount===0?'全部':(C.randomCount||0);
+    $('d-count').textContent=cnt;
+    $('d-total').textContent=C.stats?.processedCount||0;
+    $('d-today').textContent=C.stats?.todayProcessedCount||0;
+}
+async function loadLogs(){
+    try{
+        const r=await af('/logs');
+        if(r.success){
+            const logs=r.data||[];
+            const f=logFlt==='all'?logs:logs.filter(l=>l.level===logFlt);
+            $('logCnt').textContent=`${f.length}/${logs.length} 条`;
+            const c=$('logC');
+            if(!f.length){c.innerHTML='<p style="color:#64748b">暂无日志</p>';return}
+            c.innerHTML=f.map(l=>{
+                const t=new Date(l.time);
+                const ts=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
+                const lv=l.level.toUpperCase().padEnd(5);
+                return `<div class="log-e log-${l.level}"><span class="lt">${ts}</span> <span class="ll">[${lv}]</span> <span class="lm">${esc(l.msg)}</span></div>`;
+            }).join('');
+            if($('logAS')?.checked)c.scrollTop=c.scrollHeight;
+        }
+    }catch{$('logC').innerHTML='<p style="color:#ef4444">获取失败</p>'}
+}
+function fltLog(lv,btn){
+    logFlt=lv;
+    btn.parentElement.querySelectorAll('button').forEach(b=>{b.style.background='rgba(251,114,153,.1)';b.style.color='#FB7299'});
+    btn.style.background='linear-gradient(135deg,#FB7299,#e05a80)';btn.style.color='#fff';
+    loadLogs();
+}
+async function clrLogs(){
+    try{await af('/logs/clear','POST');await loadLogs();toast('日志已清除')}catch{toast('清除失败')}
+}
+
+(async()=>{
+    if(window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.classList.add('dark');
+    await loadData();
+    updDash();
+})();
+</script>
+</body>
+</html>

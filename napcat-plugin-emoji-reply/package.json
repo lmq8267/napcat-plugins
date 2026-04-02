@@ -1,0 +1,39 @@
+{
+  "name": "napcat-plugin-emoji-reply",
+  "plugin": "随机回应表情",
+  "version": "1.0.0",
+  "icon": "icon.png",
+  "type": "module",
+  "main": "index.mjs",
+  "description": "随机回应表情的插件，支持多个 QQ 号、QFace 表情选择、随机回应数量",
+  "author": "lmq8267",
+  "license": "MIT",
+  "keywords": [
+    "napcat",
+    "plugin",
+    "qq",
+    "emoji",
+    "reply"
+  ],
+  "napcat": {
+    "tags": [
+      "工具",
+      "娱乐"
+    ],
+    "minVersion": "4.14.0",
+    "homepage": ""
+  },
+  "dependencies": {
+    "napcat-types": "0.0.16"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.3.1",
+    "@types/node": "^20.19.33",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.1"
+  },
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  }
+}

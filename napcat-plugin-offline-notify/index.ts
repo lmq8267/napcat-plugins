@@ -1,6 +1,12 @@
 import type { PluginModule, NapCatPluginContext, PluginConfigSchema, PluginLogger } from 'napcat-types/napcat-onebot/network/plugin-manger';
 import fs from 'fs';
+import { readFileSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+  
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 interface Config {
   enabled: boolean;
@@ -219,12 +225,19 @@ const plugin_init: PluginModule['plugin_init'] = async (c: NapCatPluginContext) 
   } catch (e) {
     log('warn', '配置 UI 初始化失败: ' + e);
   }
+  
+  const packageJson = JSON.parse(readFileSync(path.join(__dirname, 'package.json'), 'utf-8'));
+  const version = packageJson.version;
 
   const router = (ctx as any).router;
   router.page({ path: 'config', title: '离线通知配置', icon: '🔔', htmlFile: 'webui/config.html', description: '离线通知配置面板' });
 
-  router.getNoAuth('/status', (_req, res) => {
-    res.json({ success: true, data: state, version: '1.0.0' });
+  router.getNoAuth('/status', (_req: any, res: any) => {
+    res.json({
+      success: true,
+      data: { ...state, config },
+      version
+    });
   });
 
   router.getNoAuth('/config', (_req, res) => {
