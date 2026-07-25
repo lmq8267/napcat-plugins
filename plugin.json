@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updateTime": "2026-04-02T13:06:31Z",
+  "updateTime": "2026-07-25T07:12:48Z",
   "plugins": [
     {
       "id": "napcat-plugin-emoji-reply",
@@ -9,7 +9,7 @@
       "description": "随机回应表情的插件，支持多个 QQ 号、QFace 表情选择、随机回应数量",
       "author": "lmq8267",
       "homepage": "",
-      "downloadUrl": "https://github.com/lmq8267/napcat-plugins/releases/download/plugins/napcat-plugin-emoji-reply.zip",
+      "downloadUrl": "https://github.com/lmq8267/napcat-plugin-8267/releases/download/plugins/napcat-plugin-emoji-reply.zip",
       "tags": ["工具","娱乐"],
       "minVersion": "4.14.0"
     },
@@ -20,7 +20,7 @@
       "description": "监控帐号状态离线时采用企业微信机器人推送通知的插件",
       "author": "lmq8267",
       "homepage": "",
-      "downloadUrl": "https://github.com/lmq8267/napcat-plugins/releases/download/plugins/napcat-plugin-offline-notify.zip",
+      "downloadUrl": "https://github.com/lmq8267/napcat-plugin-8267/releases/download/plugins/napcat-plugin-offline-notify.zip",
       "tags": ["工具","监控"],
       "minVersion": "4.14.0"
     },
@@ -31,7 +31,7 @@
       "description": "检测 QQ 版本与 NapCat 推荐的 QQ 版本，支持在线更新升级",
       "author": "AQiaoYo",
       "homepage": "",
-      "downloadUrl": "https://github.com/lmq8267/napcat-plugins/releases/download/plugins/napcat-plugin-qq-version.zip",
+      "downloadUrl": "https://github.com/lmq8267/napcat-plugin-8267/releases/download/plugins/napcat-plugin-qq-version.zip",
       "tags": ["工具"],
       "minVersion": "4.14.0"
     }
