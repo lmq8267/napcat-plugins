@@ -4,9 +4,13 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-  
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const ACTION_TIMEOUT = 20000;  // ctx.actions.call 超时 20s
+const FETCH_TIMEOUT = 15000;   // fetch 超时 15s
+const CONSECUTIVE_FAILURE_THRESHOLD = 2; // 连续失败 N 次才判离线
 
 interface Config {
   enabled: boolean;
@@ -24,6 +28,8 @@ interface State {
   nextCheckTime: number;
   logs: LogEntry[];
   checking: boolean;
+  consecutiveFailures: number;
+  lastCheckTime: number;
 }
 
 interface LogEntry {
@@ -48,15 +54,24 @@ let state: State = {
   lastNotifyTime: 0,
   nextCheckTime: 0,
   logs: [],
-  checking: false
+  checking: false,
+  consecutiveFailures: 0,
+  lastCheckTime: 0,
 };
 let checkTimer: NodeJS.Timeout | null = null;
-let lastGroupListTime = 0;
-let lastRecentContactTime = 0;
 
 export let plugin_config_ui: PluginConfigSchema = [];
 
 let lastTestResponse = '';
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} 超时 (${ms}ms)`)), ms)
+    )
+  ]);
+}
 
 function log(level: 'info' | 'warn' | 'error', msg: string) {
   logger?.[level]?.(msg);
@@ -108,27 +123,38 @@ async function sendNotify(reason: string) {
 
   for (let i = 0; i <= config.retryCount; i++) {
     try {
-      const res = await fetch(config.webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msgtype: 'text', text: { content } })
-      });
-      const text = await res.text();
-      let json;
-      try { json = JSON.parse(text); } catch { json = { errcode: -1, errmsg: text }; }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+      try {
+        const res = await fetch(config.webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ msgtype: 'text', text: { content } }),
+          signal: controller.signal
+        });
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch { json = { errcode: -1, errmsg: text }; }
 
-      if (json.errcode === 0) {
-        state.lastNotifyTime = now;
-        state.status = 'offline';
-        saveState();
-        log('info', `通知推送成功 - ${reason}`);
-        return { success: true, response: text };
+        if (json.errcode === 0) {
+          state.lastNotifyTime = now;
+          saveState();
+          log('info', `通知推送成功 - ${reason}`);
+          return { success: true, response: text };
+        }
+        log('warn', `通知推送失败: ${json.errmsg || text}，重试 ${i + 1}/${config.retryCount}`);
+        if (i === config.retryCount) return { success: false, response: json.errmsg || text };
+      } finally {
+        clearTimeout(timeoutId);
       }
-      log('warn', `通知推送失败: ${json.errmsg || text}，重试 ${i + 1}/${config.retryCount}`);
-      if (i === config.retryCount) return { success: false, response: json.errmsg || text };
     } catch (e) {
-      log('error', `通知推送异常: ${e}`);
-      if (i === config.retryCount) return { success: false, response: String(e) };
+      const errMsg = e instanceof Error ? e.message : String(e);
+      if ((e as any)?.name === 'AbortError') {
+        log('warn', `通知推送超时，重试 ${i + 1}/${config.retryCount}`);
+      } else {
+        log('error', `通知推送异常: ${errMsg}`);
+      }
+      if (i === config.retryCount) return { success: false, response: errMsg };
     }
     if (i < config.retryCount) await new Promise(r => setTimeout(r, 2000));
   }
@@ -136,45 +162,66 @@ async function sendNotify(reason: string) {
 }
 
 async function checkOnline() {
+  // 并发保护：上次检测未完成则跳过
+  if (state.checking) {
+    log('warn', '上一次检测尚未完成，跳过本次定时检测');
+    return;
+  }
+
   const methods = config.checkMethods.filter(m => m !== 'kickedOffLine');
   if (methods.length === 0) return;
 
   state.checking = true;
+  state.lastCheckTime = Date.now();
   saveState();
+
   let allFailed = true;
 
   if (methods.includes('getGroupList')) {
     try {
-      const res = await ctx.actions.call('get_group_list', {} as never, ctx.adapterName, ctx.networkConfig);
+      const res = await withTimeout(
+        ctx.actions.call('get_group_list', {} as never, ctx.adapterName, ctx.networkConfig),
+        ACTION_TIMEOUT,
+        'get_group_list'
+      );
       if (res && Array.isArray(res) && res.length > 0) {
-        lastGroupListTime = Date.now();
         allFailed = false;
       }
     } catch (e) {
-      log('warn', '获取群列表失败: ' + e);
+      log('warn', '获取群列表失败: ' + (e instanceof Error ? e.message : String(e)));
     }
   }
 
   if (methods.includes('getRecentContact')) {
     try {
-      const res = await ctx.actions.call('get_friend_list', {} as never, ctx.adapterName, ctx.networkConfig);
+      const res = await withTimeout(
+        ctx.actions.call('get_friend_list', {} as never, ctx.adapterName, ctx.networkConfig),
+        ACTION_TIMEOUT,
+        'get_friend_list'
+      );
       if (res && Array.isArray(res) && res.length > 0) {
-        lastRecentContactTime = Date.now();
         allFailed = false;
       }
     } catch (e) {
-      log('warn', '获取好友列表失败: ' + e);
+      log('warn', '获取好友列表失败: ' + (e instanceof Error ? e.message : String(e)));
     }
   }
 
   if (allFailed) {
-    if ((state.status === 'online' || state.status === 'unknown') && config.enabled) {
-      await sendNotify('检测方式无响应');
-    } else {
+    state.consecutiveFailures++;
+    log('warn', `检测失败 (连续 ${state.consecutiveFailures}/${CONSECUTIVE_FAILURE_THRESHOLD} 次)`);
+
+    // 达到连续失败阈值 且 之前是在线/未知状态 才触发离线通知
+    if (state.consecutiveFailures >= CONSECUTIVE_FAILURE_THRESHOLD) {
+      if ((state.status === 'online' || state.status === 'unknown') && config.enabled) {
+        await sendNotify('检测方式无响应');
+      }
       state.status = 'offline';
-      saveState();
     }
+    // 未达阈值：保持当前状态，不切换
   } else {
+    // 检测成功 → 重置失败计数
+    state.consecutiveFailures = 0;
     if (state.status === 'offline' || state.status === 'unknown') {
       state.status = 'online';
       state.onlineTime = Date.now();
@@ -284,22 +331,29 @@ const plugin_init: PluginModule['plugin_init'] = async (c: NapCatPluginContext) 
         return;
       }
 
-      const result = await fetch(config.webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msgtype: 'text', text: { content } })
-      });
-      const text = await result.text();
-      let json;
-      try { json = JSON.parse(text); } catch { json = { errcode: -1, errmsg: text }; }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+      try {
+        const result = await fetch(config.webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ msgtype: 'text', text: { content } }),
+          signal: controller.signal
+        });
+        const text = await result.text();
+        let json;
+        try { json = JSON.parse(text); } catch { json = { errcode: -1, errmsg: text }; }
 
-      lastTestResponse = text;
-      if (json.errcode === 0) {
-        log('info', '测试通知推送成功');
-      } else {
-        log('warn', `测试通知推送失败: ${json.errmsg || text}`);
+        lastTestResponse = text;
+        if (json.errcode === 0) {
+          log('info', '测试通知推送成功');
+        } else {
+          log('warn', `测试通知推送失败: ${json.errmsg || text}`);
+        }
+        res.json({ success: json.errcode === 0, response: text });
+      } finally {
+        clearTimeout(timeoutId);
       }
-      res.json({ success: json.errcode === 0, response: text });
     } catch (e) {
       log('error', '测试通知异常: ' + e);
       lastTestResponse = String(e);
@@ -323,8 +377,16 @@ const plugin_init: PluginModule['plugin_init'] = async (c: NapCatPluginContext) 
 
   router.postNoAuth('/check', async (_req, res) => {
     if (state.checking) {
-      res.json({ success: false, error: '检测进行中' });
-      return;
+      // 如果 checking 状态超过 5 分钟未恢复，视为 stale 并重置
+      const staleThreshold = Date.now() - 300000;
+      if (state.lastCheckTime > 0 && state.lastCheckTime < staleThreshold) {
+        log('warn', '检测到 stale checking 状态，自动重置');
+        state.checking = false;
+        saveState();
+      } else {
+        res.json({ success: false, error: '检测进行中' });
+        return;
+      }
     }
     log('info', '手动触发立即检测');
     await checkOnline();
@@ -349,6 +411,10 @@ const plugin_init: PluginModule['plugin_init'] = async (c: NapCatPluginContext) 
       state.logs = raw.logs || [];
       state.lastNotifyTime = raw.lastNotifyTime || 0;
       state.nextCheckTime = raw.nextCheckTime || 0;
+      state.consecutiveFailures = raw.consecutiveFailures || 0;
+      state.lastCheckTime = raw.lastCheckTime || 0;
+      state.status = raw.status || 'unknown';
+      state.checking = false; // 重启后强制重置，避免 stale 状态
     } catch (e) {
       log('warn', '加载状态失败: ' + e);
     }
@@ -362,7 +428,8 @@ const plugin_init: PluginModule['plugin_init'] = async (c: NapCatPluginContext) 
   });
 
   startCheck();
-  await checkOnline();
+  // 首次检测不阻塞初始化，异步执行
+  checkOnline().catch(e => log('error', '首次检测异常: ' + (e instanceof Error ? e.message : String(e))));
   log('info', '离线通知插件初始化完成');
 };
 
@@ -378,6 +445,9 @@ export const plugin_set_config = async (_ctx: NapCatPluginContext, cfg: Config) 
   saveConfig();
   stopCheck();
   startCheck();
+  // 配置变更后重置失败计数，让插件以新配置重新开始检测
+  state.consecutiveFailures = 0;
+  saveState();
 };
 
 export { plugin_init, plugin_cleanup };
