@@ -11,6 +11,7 @@ interface Config {
   selectedEmojiIds: string[];
   randomCount: number;
   groupIds: string[];
+  responseProbability: number;
 }
 
 interface State {
@@ -46,6 +47,7 @@ let config: Config = {
   selectedEmojiIds: [],
   randomCount: 1,
   groupIds: [],
+  responseProbability: 100,
 };
 let state: State = {
   logs: [],
@@ -191,9 +193,17 @@ async function handleMessage(event: any): Promise<void> {
     return;
   }
 
+  // 几率性回复判断
+  if (config.responseProbability < 100) {
+    const roll = Math.random() * 100;
+    if (roll >= config.responseProbability) {
+      return; // 未命中概率，静默跳过不记录日志
+    }
+  }
+
   const emojisToSend = getRandomEmojis();
   if (emojisToSend.length === 0) {
-    log('warn', '(；′⌒`) 未选择表情，无法回应');
+    logger?.warn?.('(；′⌒`) 未选择表情，无法回应');
     return;
   }
 

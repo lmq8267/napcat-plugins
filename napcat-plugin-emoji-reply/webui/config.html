@@ -41,6 +41,10 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-s
 .tag{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-size:12px;background:rgba(251,114,153,.1);color:#FB7299;max-width:200px}
 .tag button{background:none;border:none;cursor:pointer;color:inherit;font-size:14px;line-height:1}
 .tag button:hover{color:#ef4444}
+input[type=range]{-webkit-appearance:none;appearance:none;height:6px;border-radius:3px;background:linear-gradient(90deg,#FB7299,#e05a80);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:#FB7299;cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:.2s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#FB7299;cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:10000}
 .modal-overlay.active{display:flex}
 .modal{background:#fff;border-radius:16px;padding:24px;width:90%;max-width:700px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column}
@@ -124,11 +128,12 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-s
 <div class="w-10 h-10 bg-gradient-to-br from-pink-400 to-pink-600 rounded-xl text-white text-xl flex items-center justify-center">😊</div>
 <div><h3 class="font-bold text-lg">随机回应表情</h3><p class="text-xs text-gray-400">自动回应指定用户的消息</p></div>
 </div>
-<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3">
 <div class="text-center p-3 rounded-lg bg-pink-50 dark:bg-pink-950/30"><div class="text-xl font-bold" id="d-enabled">-</div><div class="text-xs text-gray-500 mt-1">启用状态</div></div>
 <div class="text-center p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30"><div class="text-xl font-bold text-emerald-500" id="d-users">-</div><div class="text-xs text-gray-500 mt-1">目标用户</div></div>
 <div class="text-center p-3 rounded-lg bg-violet-50 dark:bg-violet-950/30"><div class="text-xl font-bold text-violet-500" id="d-emojis">-</div><div class="text-xs text-gray-500 mt-1">选中表情</div></div>
 <div class="text-center p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30"><div class="text-xl font-bold text-amber-500" id="d-count">-</div><div class="text-xs text-gray-500 mt-1">回应数量</div></div>
+<div class="text-center p-3 rounded-lg bg-rose-50 dark:bg-rose-950/30"><div class="text-xl font-bold text-rose-500" id="d-probability">-</div><div class="text-xs text-gray-500 mt-1">回应机率</div></div>
 </div>
 </div>
 <div class="glass p-5">
@@ -169,6 +174,21 @@ html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-s
 <input type="number" id="c-count" class="ipt w-32" value="1" min="0" onchange="updateCount()">
 <span class="text-sm text-gray-500">0 = 回应全部选中的表情</span>
 </div>
+</div>
+
+<div class="glass p-5 mb-4">
+<h3 class="font-semibold mb-3">🎯 随机回应机率</h3>
+<div class="flex items-center gap-4">
+<input type="range" id="c-probability" class="w-48" min="0" max="100" value="100" oninput="updateProbability()">
+<input type="number" id="c-probability-num" class="ipt w-20" value="100" min="0" max="100" onchange="syncProbabilitySlider()">
+<span class="text-sm text-gray-500 font-bold" id="c-probability-label">100%</span>
+</div>
+<div class="flex items-center gap-2 mt-2">
+<div class="flex-1 h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+<div id="c-probability-bar" class="h-full rounded-full transition-all duration-300" style="width:100%;background:linear-gradient(135deg,#FB7299,#e05a80)"></div>
+</div>
+</div>
+<p class="text-xs text-gray-400 mt-2">设置为 100% 时每条消息都回复，设为 0% 则不回复。<span id="c-probability-hint" class="text-pink-500">当前：每条消息都回复</span></p>
 </div>
 
 <div class="glass p-5 mb-4">
@@ -283,7 +303,8 @@ function renderPageSelectedEmojis(){
     con.innerHTML=sel.map(id=>{
         const e=EMOJI_LIST.find(x=>x.QSid===id);
         const isStatic=e?.isStatic==='1';
-        return `<span class="tag"><img src="${getEmojiUrl(id,isStatic)}" style="width:18px;height:18px">${e?e.QDes:id}<button onclick="delEmoji('${id}')">×</button></span>`;
+        const emojiName=e?e.QDes:id;
+        return `<span class="tag" title="${esc(emojiName)} (${id})"><img src="${getEmojiUrl(id,isStatic)}" style="width:18px;height:18px">${emojiName}<button onclick="delEmoji('${id}')">×</button></span>`;
     }).join('');
 }
 function renderGrpMulti(){
@@ -321,6 +342,34 @@ function delEmoji(id){
 }
 function updateCount(){C.randomCount=gn('c-count',1)}
 
+function updateProbability(){
+    const v=parseInt($('c-probability').value);
+    $('c-probability-num').value=v;
+    $('c-probability-label').textContent=v+'%';
+    $('c-probability-bar').style.width=v+'%';
+    const hint=$('c-probability-hint');
+    if(v>=100)hint.textContent='当前：每条消息都回复';
+    else if(v<=0)hint.textContent='当前：不会回复任何消息';
+    else if(v<=30)hint.textContent='当前：回复机率较低 ('+v+'%)';
+    else if(v<=70)hint.textContent='当前：回复机率中等 ('+v+'%)';
+    else hint.textContent='当前：回复机率较高 ('+v+'%)';
+}
+function syncProbabilitySlider(){
+    let v=parseInt($('c-probability-num').value);
+    if(isNaN(v)||v<0)v=0;
+    if(v>100)v=100;
+    $('c-probability-num').value=v;
+    $('c-probability').value=v;
+    $('c-probability-label').textContent=v+'%';
+    $('c-probability-bar').style.width=v+'%';
+    const hint=$('c-probability-hint');
+    if(v>=100)hint.textContent='当前：每条消息都回复';
+    else if(v<=0)hint.textContent='当前：不会回复任何消息';
+    else if(v<=30)hint.textContent='当前：回复机率较低 ('+v+'%)';
+    else if(v<=70)hint.textContent='当前：回复机率中等 ('+v+'%)';
+    else hint.textContent='当前：回复机率较高 ('+v+'%)';
+}
+
 function openEmojiModal(){
     tempSelectedEmojis=new Set(C.selectedEmojiIds||[]);
     $('emojiModal').classList.add('active');
@@ -347,7 +396,7 @@ function renderEmojiGrid(){
     grid.innerHTML=filtered.map(e=>{
         const isSel=tempSelectedEmojis.has(e.QSid);
         const isStatic=e.isStatic==='1';
-        return `<div class="emoji-item${isSel?' selected':''}" onclick="tglTempEmoji('${e.QSid}')" title="${e.QDes} (${e.QSid})"><img src="${getEmojiUrl(e.QSid,isStatic)}" loading="lazy" alt="${e.QDes}"></div>`;
+        return `<div class="emoji-item${isSel?' selected':''}" onclick="tglTempEmoji('${e.QSid}')" title="${esc(e.QDes)} (ID: ${e.QSid})${e.isStatic==='1'?' [静态]':' [动图]'}"><img src="${getEmojiUrl(e.QSid,isStatic)}" loading="lazy" alt="${e.QDes}"></div>`;
     }).join('');
 }
 function renderModalSelectedEmojis(){
@@ -358,7 +407,8 @@ function renderModalSelectedEmojis(){
     con.innerHTML=sel.map(id=>{
         const e=EMOJI_LIST.find(x=>x.QSid===id);
         const isStatic=e?.isStatic==='1';
-        return `<span class="tag"><img src="${getEmojiUrl(id,isStatic)}" style="width:18px;height:18px">${e?e.QDes:id}<button onclick="tglTempEmoji('${id}')">×</button></span>`;
+        const emojiName=e?e.QDes:id;
+        return `<span class="tag" title="${esc(emojiName)} (${id})"><img src="${getEmojiUrl(id,isStatic)}" style="width:18px;height:18px">${emojiName}<button onclick="tglTempEmoji('${id}')">×</button></span>`;
     }).join('');
 }
 
@@ -385,6 +435,10 @@ async function loadData(){
 function fillCfg(){
     stg('c-enabled',C.enabled);
     $('c-count').value=C.randomCount||1;
+    const prob=C.responseProbability!==undefined?C.responseProbability:100;
+    $('c-probability').value=prob;
+    $('c-probability-num').value=prob;
+    updateProbability();
     renderUserTags();
 }
 function fillGrps(){
@@ -394,6 +448,7 @@ function fillGrps(){
 async function doSave(){
     C.enabled=gtg('c-enabled');
     C.randomCount=gn('c-count',1);
+    C.responseProbability=parseInt($('c-probability').value)||100;
     try{
         const r=await af('/config','POST',C);
         if(r.success){toast('配置已保存','success');loadData();}else toast(r.error||'保存失败','error')
@@ -406,6 +461,8 @@ function updDash(){
     $('d-emojis').textContent=(C.selectedEmojiIds||[]).length;
     const cnt=C.randomCount===0?'全部':(C.randomCount||0);
     $('d-count').textContent=cnt;
+    const prob=C.responseProbability!==undefined?C.responseProbability:100;
+    $('d-probability').textContent=prob+'%';
     $('d-total').textContent=C.stats?.processedCount||0;
     $('d-today').textContent=C.stats?.todayProcessedCount||0;
 }
